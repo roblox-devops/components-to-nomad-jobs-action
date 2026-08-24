@@ -1,62 +1,116 @@
 /**
- * Unit tests for the action's main functionality, src/main.ts
- *
- * To mock dependencies in ESM, you can create fixtures that export mock
- * functions and objects. For example, the core module is mocked in this test,
- * so that the actual '@actions/core' module is not imported.
+ * Unit tests for the action entrypoint in src/main.ts
  */
 import { jest } from '@jest/globals';
+
 import * as core from '../__fixtures__/core.js';
-import { wait } from '../__fixtures__/wait.js';
 
-// Mocks should be declared before the module being tested is imported.
-jest.unstable_mockModule('@actions/core', () => core);
-jest.unstable_mockModule('../src/wait.js', () => ({ wait }));
+const parseAndValidateComponent = jest.fn();
+const generateNomadJob = jest.fn();
 
-// The module being tested should be imported dynamically. This ensures that the
-// mocks are used in place of any actual dependencies.
+jest.unstable_mockModule('@actions/core', () => ({
+  getInput: core.getInput,
+  setFailed: core.setFailed,
+  setOutput: core.setOutput,
+}));
+
+jest.unstable_mockModule('../src/component/get.js', () => ({
+  parseAndValidateComponent,
+}));
+
+jest.unstable_mockModule('../src/nomad/job.js', () => ({
+  generateNomadJob,
+}));
+
 const { run } = await import('../src/main.js');
 
 describe('main.ts', () => {
   beforeEach(() => {
-    // Set the action's inputs as return values from core.getInput().
-    core.getInput.mockImplementation(() => '500');
-
-    // Mock the wait function so that it does not actually wait.
-    wait.mockImplementation(() => Promise.resolve('done!'));
+    jest.clearAllMocks();
   });
 
-  afterEach(() => {
-    jest.resetAllMocks();
-  });
+  it('sets the nomad-files output for each valid component', async () => {
+    const componentConfig = {
+      deployment: {
+        count: 2,
+        job: 'example',
+        type: 'service',
+      },
+    };
 
-  it('Sets the time output', async () => {
+    core.getInput.mockImplementation((name: string) => {
+      switch (name) {
+        case 'components':
+          return JSON.stringify({ 'example-api:1.2.3': '/tmp/example.yaml' });
+        case 'datacenters':
+          return 'dc1, dc2';
+        case 'resources':
+          return 'example-api,500:256';
+        default:
+          return '';
+      }
+    });
+
+    parseAndValidateComponent.mockReturnValue(componentConfig);
+    generateNomadJob.mockReturnValue(
+      'job "example" {\n  group "example-api" {}\n}',
+    );
+
     await run();
 
-    // Verify the time output was set.
-    expect(core.setOutput).toHaveBeenNthCalledWith(
-      1,
-      'time',
-      // Simple regex to match a time string in the format HH:MM:SS.
-      expect.stringMatching(/^\d{2}:\d{2}:\d{2}/),
+    expect(parseAndValidateComponent).toHaveBeenCalledWith(
+      'example-api:1.2.3',
+      ['example-api,500:256'],
+      '/tmp/example.yaml',
+    );
+    expect(generateNomadJob).toHaveBeenCalledWith(
+      'example-api',
+      '1.2.3',
+      ['dc1', 'dc2'],
+      componentConfig.deployment,
+    );
+    expect(core.setOutput).toHaveBeenCalledWith(
+      'nomad-files',
+      JSON.stringify({
+        'example-api:1.2.3': 'job "example" {\n  group "example-api" {}\n}',
+      }),
     );
   });
 
-  it('Sets a failed status', async () => {
-    // Clear the getInput mock and return an invalid value.
-    core.getInput.mockClear().mockReturnValueOnce('this is not a number');
-
-    // Clear the wait mock and return a rejected promise.
-    wait
-      .mockClear()
-      .mockRejectedValueOnce(new Error('milliseconds is not a number'));
+  it('fails the action when a component entry is invalid', async () => {
+    core.getInput.mockImplementation((name: string) => {
+      switch (name) {
+        case 'components':
+          return JSON.stringify({ '': '/tmp/example.yaml' });
+        case 'datacenters':
+          return 'dc1';
+        case 'resources':
+          return '';
+        default:
+          return '';
+      }
+    });
 
     await run();
 
-    // Verify that the action was marked as failed.
-    expect(core.setFailed).toHaveBeenNthCalledWith(
-      1,
-      'milliseconds is not a number',
+    expect(core.setFailed).toHaveBeenCalledWith(
+      'Invalid component configuration',
+    );
+  });
+
+  it('fails the action when the input parsing throws an error', async () => {
+    core.getInput.mockImplementation((name: string) => {
+      if (name === 'components') {
+        throw new Error('components input is malformed');
+      }
+
+      return '';
+    });
+
+    await run();
+
+    expect(core.setFailed).toHaveBeenCalledWith(
+      'components input is malformed',
     );
   });
 });

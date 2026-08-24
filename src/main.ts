@@ -1,5 +1,10 @@
-import * as core from '@actions/core';
-import { wait } from './wait.js';
+import { getInput, setFailed, setOutput } from '@actions/core';
+
+import { generateNomadJob } from './nomad/job.js';
+import { parseAndValidateComponent } from './component/get.js';
+
+import type { TComponentKey } from './types/components.js';
+import type { TComponentDeploymentConfiguration } from './types/component_deployment_configuration.js';
 
 /**
  * The main function for the action.
@@ -8,20 +13,60 @@ import { wait } from './wait.js';
  */
 export async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds');
+    const components = JSON.parse(
+      getInput('components', { required: true }),
+    ) as Record<TComponentKey, string>;
 
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`Waiting ${ms} milliseconds ...`);
+    const datacenters = (
+      getInput('datacenters', { required: false })?.split(',') || ['*']
+    )
+      .map((dc) => dc.trim())
+      .filter((dc) => dc.length > 0);
 
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString());
-    await wait(parseInt(ms, 10));
-    core.debug(new Date().toTimeString());
+    const resources = getInput('resources', { required: false })
+      .split(';')
+      .map((resource) => resource.trim())
+      .filter((resource) => resource.length > 0);
 
-    // Set outputs for other workflow steps to use
-    core.setOutput('time', new Date().toTimeString());
+    const ouputJobs: Record<string, string> = {};
+
+    for (const entry of Object.entries(components)) {
+      const [component, componentConfigurationPath] = entry as [
+        TComponentKey,
+        string,
+      ];
+
+      if (!component || !componentConfigurationPath) {
+        setFailed('Invalid component configuration');
+
+        return;
+      }
+
+      const componentConfiguration = parseAndValidateComponent(
+        component,
+        resources,
+        componentConfigurationPath,
+      );
+
+      if (!componentConfiguration) {
+        continue;
+      }
+
+      const [componentName, componentVersion] = component.split(':');
+
+      const job = generateNomadJob(
+        componentName,
+        componentVersion,
+        datacenters,
+        componentConfiguration.deployment as TComponentDeploymentConfiguration,
+      );
+
+      ouputJobs[component] = job;
+    }
+
+    setOutput('nomad-files', JSON.stringify(ouputJobs));
   } catch (error) {
     // Fail the workflow run if an error occurs
-    if (error instanceof Error) core.setFailed(error.message);
+    if (error instanceof Error) setFailed(error.message);
   }
 }

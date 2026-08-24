@@ -1,20 +1,22 @@
 {
-  "name": "typescript-action",
-  "description": "GitHub Actions TypeScript template",
-  "version": "0.0.0",
-  "author": "",
+  "name": "@roblox-devops/components-to-nomad-jobs-action",
+  "description": "Translate Roblox component config files into Nomad job definitions",
+  "version": "1.0.0",
+  "author": "Roblox DevOps",
   "type": "module",
   "private": true,
-  "homepage": "https://github.com/actions/typescript-action",
+  "homepage": "https://github.com/roblox-devops/components-to-nomad-jobs-action",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/actions/typescript-action.git"
+    "url": "git+https://github.com/roblox-devops/components-to-nomad-jobs-action.git"
   },
   "bugs": {
-    "url": "https://github.com/actions/typescript-action/issues"
+    "url": "https://github.com/roblox-devops/components-to-nomad-jobs-action/issues"
   },
   "keywords": [
-    "actions"
+    "actions",
+    "nomad",
+    "roblox"
   ],
   "exports": {
     ".": "./dist/index.js"
@@ -37,7 +39,8 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@actions/core": "^3.0.0"
+    "@actions/core": "^3.0.0",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@eslint/compat": "^2.0.2",

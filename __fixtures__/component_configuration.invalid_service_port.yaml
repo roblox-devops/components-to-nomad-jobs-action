@@ -1,0 +1,15 @@
+component: example-api
+deployment:
+  count: 1
+  job: example
+  type: service
+  containers:
+    - image: nginx:latest
+      network:
+        ports:
+          '8080':
+            static: 8080
+            to: 80
+      services:
+        - name: web
+          port: '9090'
