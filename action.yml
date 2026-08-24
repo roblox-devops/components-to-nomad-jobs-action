@@ -1,23 +1,34 @@
-name: The name of your action here
-description: Provide a description here
-author: Your name or organization here
+name: 'components-to-nomad-jobs-action'
+description:
+  'Converts Roblox component configuration files into Nomad job definitions'
+author: 'Roblox DevOps'
 
-# Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
-  icon: heart
-  color: red
+  icon: package
+  color: blue
 
-# Define your inputs here.
 inputs:
-  milliseconds:
-    description: Your input description here
+  components:
+    description: 'JSON map of component keys to component YAML file paths'
     required: true
-    default: '1000'
 
-# Define your outputs here.
+  datacenters:
+    description:
+      'Comma-separated list of Nomad datacenters to include in generated jobs'
+    required: false
+    default: '*'
+
+  resources:
+    description:
+      'Semicolon-separated resource overrides in the form component,cpu:ram'
+    required: false
+    default: ''
+
 outputs:
-  time:
-    description: Your output description here
+  nomad-files:
+    description:
+      'JSON object mapping each component key to the generated Nomad job
+      definition'
 
 runs:
   using: node24

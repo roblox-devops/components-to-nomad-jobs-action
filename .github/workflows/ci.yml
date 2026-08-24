@@ -57,8 +57,12 @@ jobs:
         id: test-action
         uses: ./
         with:
-          milliseconds: 2000
+          components:
+            '{"example-api:1.2.3":
+            "./__fixtures__/component_configuration.valid.yaml"}'
+          datacenters: 'dc1, dc2'
+          resources: 'example-api,500:256'
 
       - name: Print Output
         id: output
-        run: echo "${{ steps.test-action.outputs.time }}"
+        run: echo "${{ steps.test-action.outputs.nomad-files }}"

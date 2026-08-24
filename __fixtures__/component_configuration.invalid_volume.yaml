@@ -1,0 +1,9 @@
+component: example-api
+deployment:
+  count: 1
+  job: example
+  type: service
+  containers:
+    - image: nginx:latest
+      volumes:
+        - bad-volume
